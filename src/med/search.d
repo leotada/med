@@ -26,6 +26,7 @@ import core.stdc.ctype;
 import std.string;
 import std.ascii;
 import std.uni;
+import std.algorithm;
 
 import ed;
 import line;
@@ -268,13 +269,7 @@ bool eq(int bc, int pc)
     if (CASESENSITIVE)
         return bc == pc;
 
-    if (bc>='a' && bc<='z')
-        bc -= 0x20;
-
-    if (pc>='a' && pc<='z')
-        pc -= 0x20;
-
-    return (bc == pc);
+    return std.uni.toLower(cast(dchar)bc) == std.uni.toLower(cast(dchar)pc);
 }
 
 /*********************************
@@ -571,25 +566,27 @@ enum
 
 static int ifhash(LINE* clp)
 {
-    int len;
-    int i;
-    static string[] hash = ["if","elif","else","endif"];
+    auto line = clp.l_text;
+    if (line.length == 0 || line[0] != '#')
+        return 0;
 
-    len = cast(int)clp.l_text.length;
-    if (len < 3 || lgetc(clp,0) != '#')
-        goto ret0;
-    for (i = 1; ; i++)
+    size_t i = 1;
+    while (i < line.length && isSpace(line[i]))
+        i++;
+
+    auto directive = line[i .. $];
+
+    static string[] hash = ["if", "elif", "else", "endif"];
+    foreach (h_idx, h_val; hash)
     {
-        if (i >= len)
-            goto ret0;
-        if (!isSpace(clp.l_text[i]))
-            break;
+        if (directive.startsWith(h_val))
+        {
+            if (directive.length > h_val.length && isalnum(directive[h_val.length]))
+                continue;
+            return cast(int)(h_idx + 1);
+        }
     }
-    for (int h = 0; h < hash.length; h++)
-        if (len - i >= hash[h].length &&
-            clp.l_text[i .. i + hash[h].length] == hash[h])
-            return h + 1;
-ret0:
+
     return 0;
 }
 
@@ -605,12 +602,16 @@ int search_paren(bool f, int n)
     LINE* clp;
     int cbo;
     int len;
-    int i;
-    char chinc,chdec,ch;
+    dchar chinc, chdec, ch;
     int count;
     int forward;
     int h;
-    static char[2][] bracket = [['(',')'],['<','>'],['[',']'],['{','}']];
+    static immutable dchar[dchar] bracketPairs = [
+        '(': ')', ')': '(',
+        '[': ']', ']': '[',
+        '{': '}', '}': '{',
+        '<': '>', '>': '<',
+    ];
 
     clp = curwp.w_dotp;         /* get pointer to current line  */
     cbo = curwp.w_doto;         /* and offset into that line    */
@@ -623,24 +624,23 @@ int search_paren(bool f, int n)
         chinc = lgetc(clp,cbo);
 
     if (cbo == 0 && (h = ifhash(clp)) != 0)
-    {   forward = h != HASH_ENDIF;
+    {
+        forward = h != HASH_ENDIF;
     }
     else
     {
-        forward = TRUE;                 /* forward                      */
         h = 0;
-        chdec = chinc;
-        for (i = 0; i < bracket.length; i++)
-            if (bracket[i][0] == chinc)
-            {   chdec = bracket[i][1];
-                break;
-            }
-        for (i = 0; i < bracket.length; i++)
-            if (bracket[i][1] == chinc)
-            {   chdec = bracket[i][0];
-                forward = FALSE;        /* search backwards             */
-                break;
-            }
+        if (auto p = chinc in bracketPairs)
+        {
+            chdec = *p;
+            forward = (chinc == '(' || chinc == '[' || chinc == '{' || chinc == '<');
+        }
+        else
+        {
+            // Not on a bracket, so just search for the same character.
+            chdec = chinc;
+            forward = TRUE;
+        }
     }
 
     while (1)                           /* while not end of buffer      */
@@ -683,16 +683,28 @@ int search_paren(bool f, int n)
                     if (h2 == HASH_ENDIF)
                         count++;
                     else if (h2 == HASH_IF)
-                    {   if (count-- == 0)
-                            goto found;
+                    {
+                        if (count-- == 0)
+                        {
+                            curwp.w_dotp  = clp;
+                            curwp.w_doto  = cbo;
+                            curwp.w_flag |= WFMOVE;
+                            return (TRUE);
+                        }
                     }
                 }
                 else
                 {   if (h2 == HASH_IF)
                         count++;
                     else
-                    {   if (count == 0)
-                            goto found;
+                    {
+                        if (count == 0)
+                        {
+                            curwp.w_dotp  = clp;
+                            curwp.w_doto  = cbo;
+                            curwp.w_flag |= WFMOVE;
+                            return (TRUE);
+                        }
                         if (h2 == HASH_ENDIF)
                             count--;
                     }
@@ -701,12 +713,11 @@ int search_paren(bool f, int n)
         }
         else
         {
-            ch = (cbo < len) ? lgetc(clp,cbo) : '\n';
+            ch = (cbo < len) ? lgetc(clp,cbo) : cast(dchar)'\n';
             if (eq(ch,chdec))
-            {   if (count-- == 0)
+            {
+                if (count-- == 0)
                 {
-                    /* We've found it   */
-                found:
                     curwp.w_dotp  = clp;
                     curwp.w_doto  = cbo;
                     curwp.w_flag |= WFMOVE;

@@ -40,6 +40,8 @@ import core.stdc.stdlib;
 import std.string;
 import std.stdio;
 import std.utf;
+import std.conv;
+import std.typecons;
 
 import ed;
 import file;
@@ -211,8 +213,14 @@ struct KEYTAB {
     int function(bool, int) k_fp; /* Routine to handle it         */
 }
 
-immutable KEYTAB[]  keytab =
-[
+alias KeyFunc = int function(bool, int);
+__gshared KeyFunc[int] keymap;
+__gshared int[dchar][int] keymap2;
+
+shared static this()
+{
+    immutable KEYTAB[]  keytab =
+    [
         /* Definitions common to all versions   */
        { CTRL('@'),              &ctrlg}, /*basic_setmark*/
        { CTRL('A'),              &gotobol},
@@ -363,11 +371,13 @@ immutable KEYTAB[]  keytab =
         {0x8048,         &help},
         {0x8049,         &openBrowser},
         {0x804A,         &scrollUnicode},
-];
+    ];
+    foreach (ref kt; keytab)
+        keymap[kt.k_code] = kt.k_fp;
 
-/* Translation table from 2 key sequence to single value        */
-immutable ushort[2][] altf_tab =
-[
+    /* Translation table from 2 key sequence to single value        */
+    immutable ushort[2][] altf_tab =
+    [
         ['B',            0x8016],         /* listbuffers          */
         ['D',            0x8037],         /* Dinsertdate          */
         ['F',            0x8017],         /* filename             */
@@ -464,8 +474,14 @@ CMDTAB[3] cmdtab =
     {   CTLX,   ctlx_tab },
     {   META,   esc_tab  },
     {   GOLD,   altf_tab },
-];
+    ];
 
+    foreach (ref cmd; cmdtab)
+    {
+        foreach (ref entry; cmd.kt)
+            keymap2[cast(dchar)entry[0]][cmd.ktprefix] = entry[1];
+    }
+}
 
 string[] gargs;
 int gargi;
@@ -607,16 +623,12 @@ void edinit(string bname)
  */
 int execute(int prefix, int c, bool f, int n)
 {
-    int    status;
-
-     /* Look in key table.   */
-    foreach (ktp; keytab)
-    {   if (ktp.k_code == c)
-        {   thisflag = 0;
-            status   = (*ktp.k_fp)(f, n);
-            lastflag = thisflag;
-            return (status);
-        }
+    if (auto pfp = c in keymap)
+    {
+        thisflag = 0;
+        immutable status = (*pfp)(f, n);
+        lastflag = thisflag;
+        return status;
     }
 
     /*
@@ -634,7 +646,7 @@ int execute(int prefix, int c, bool f, int n)
                     return (n<0 ? FALSE : TRUE);
             }
             thisflag = 0;                   /* For the future.      */
-            status   = insertmode ? line_insert(n, cast(char)c) : line_overwrite(n, cast(char)c);
+            auto status   = insertmode ? line_insert(n, cast(char)c) : line_overwrite(n, cast(char)c);
             lastflag = thisflag;
             return (status);
     }
@@ -693,24 +705,7 @@ int getkey()
 
 static int get2nd(int flag)
 {
-    int c;
-    int i,j;
-
-/+
-    auto starttime = clock();
-    while (!ttkeysininput())
-        if (clock() > starttime + CLK_TCK)
-        {   switch (flag)
-            {   case CTLX:
-                    return cast(ushort) memenu_ctlx(1,disp_cursorrow,disp_cursorcol);
-                case GOLD:
-                    return cast(ushort) memenu_gold(1,disp_cursorrow,disp_cursorcol);
-                case META:
-                    return cast(ushort) memenu_meta(1,disp_cursorrow,disp_cursorcol);
-            }
-        }
-+/
-    c = term.t_getchar();
+    int c = term.t_getchar();
 
     /* Treat control characters and lowercase the same as upper case */
     if (c>='a' && c<='z')                   /* Force to upper       */
@@ -718,22 +713,12 @@ static int get2nd(int flag)
     else if (c >= CTRL('A') && c <= CTRL('Z'))
         c += 0x40;
 
-    /* Translate to special keycode     */
-    for (i = 0; 1; i++)
-        if (cmdtab[i].ktprefix == flag)
-            break;
-    for (j = 0; 1; j++)
+    if (auto p = c in keymap2)
     {
-        if (j == cmdtab[i].kt.length)
-        {   c = 0;
-            break;
-        }
-        if (cmdtab[i].kt[j][0] == c)
-        {   c = cmdtab[i].kt[j][1];
-            break;
-        }
+        if (auto p2 = flag in *p)
+            return *p2;
     }
-    return c;
+    return 0;
 }
 
 /*
