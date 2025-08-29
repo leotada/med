@@ -15,7 +15,7 @@ import core.sys.posix.sys.ioctl;
 
 import ed;
 
-extern (C) void cfmakeraw(in termios*);
+extern (C) void cfmakeraw(termios*);
 
 
 termios  ostate;                 /* saved tty state */

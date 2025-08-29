@@ -9,4 +9,5 @@
     "targetPath": "bin",
     "sourcePaths": ["src/med"],
     "importPaths": ["src/med"],
+    "excludedSourceFiles": ["src/med/ansicolors.d", "src/med/testkbd.d"],
 }
