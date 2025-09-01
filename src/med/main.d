@@ -472,7 +472,6 @@ int gargi;
 
 private int c;
 
-version (MedApp)
 int main(string[] args)
 {
     bool   f;
