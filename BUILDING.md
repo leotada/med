@@ -8,24 +8,17 @@ You will need a D compiler (DMD) and the DUB package manager. The recommended ve
 
 ### On Debian/Ubuntu
 
-You can install DMD and DUB using the `d-apt` repository.
+If you have the DMD `.deb` package, you can install it using `dpkg`. For example:
 
-1.  **Add the d-apt repository:**
-    ```sh
-    sudo wget https://netcologne.dl.sourceforge.net/project/d-apt/files/d-apt.list -O /etc/apt/sources.list.d/d-apt.list
-    ```
+```sh
+sudo dpkg -i dmd_2.111.0-0_amd64.deb
+```
 
-2.  **Install the keyring and update:**
-    ```sh
-    sudo apt-get update --allow-insecure-repositories
-    sudo apt-get -y --allow-unauthenticated install --reinstall d-apt-keyring
-    sudo apt-get update
-    ```
+If you encounter any dependency issues after installation, run the following command to fix them:
 
-3.  **Install the compiler and dub:**
-    ```sh
-    sudo apt-get install -y dmd-compiler dub
-    ```
+```sh
+sudo apt-get install -f
+```
 
 ### Other Systems
 
