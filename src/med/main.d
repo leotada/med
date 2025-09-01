@@ -57,7 +57,7 @@ import terminal;
 import line;
 import mouse;
 import console;
-import regexp;
+import undead.regexp;
 
 int     currow;                         /* Working cursor row           */
 int     fillcol;                        /* Current fill column          */
@@ -472,6 +472,7 @@ int gargi;
 
 private int c;
 
+version (MedApp)
 int main(string[] args)
 {
     bool   f;
