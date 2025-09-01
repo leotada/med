@@ -9,6 +9,10 @@ in the [D programming language](https://dlang.org).
 
 It currently works on Windows and Linux.
 
+## Building
+
+For instructions on how to build this project, please see [BUILDING.md](BUILDING.md).
+
 To edit myfile.d:
 ```
 med myfile.d

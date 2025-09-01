@@ -8,5 +8,5 @@
     "targetName": "med",
     "targetPath": "bin",
     "sourcePaths": ["src/med"],
-    "importPaths": ["src/med"],
+    "importPaths": ["src/med"]
 }
